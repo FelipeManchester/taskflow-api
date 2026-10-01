@@ -11,7 +11,7 @@ _projects: dict[int, ProjectRead] = {}
 _ids = count(start=1)
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_project(payload: ProjectCreate) -> ProjectRead:
     project = ProjectRead(
         id=next(_ids),
@@ -22,7 +22,7 @@ def create_project(payload: ProjectCreate) -> ProjectRead:
     return project
 
 
-@router.get("/")
+@router.get("")
 def list_projects(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
