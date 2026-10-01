@@ -2,17 +2,20 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+
 @app.get("/health")
 def health():
-  return {"status": "ok"}
+    return {"status": "ok"}
+
 
 @app.get("/hello/{name}")
-def name(name: str, shout: bool = False):
-  message = f"Hello, {name}"
-  if shout:
-    message = message.upper()
-  return {"message": message}
+def hello(name: str, shout: bool = False):
+    message = f"Hello, {name}"
+    if shout:
+        message = message.upper()
+    return {"message": message}
+
 
 @app.get("/items/{item_id}")
 def item(item_id: int):
-  return {"item:", item_id}
+    return {"item": item_id}
