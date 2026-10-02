@@ -1,39 +1,54 @@
-from datetime import UTC, datetime
-from itertools import count
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_session
+from app.models import Project
 from app.schemas import ProjectCreate, ProjectRead, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-_projects: dict[int, ProjectRead] = {}
-_ids = count(start=1)
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-def create_project(payload: ProjectCreate) -> ProjectRead:
-    project = ProjectRead(
-        id=next(_ids),
-        created_at=datetime.now(UTC),
-        **payload.model_dump(),
-    )
-    _projects[project.id] = project
+async def get_project_or_404(project_id: int, session: SessionDep) -> Project:
+    project = await session.get(Project, project_id)
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
     return project
 
 
-@router.get("")
-def list_projects(
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=10, ge=1, le=100),
-) -> list[ProjectRead]:
-    projects = list(_projects.values())
-    return projects[skip : skip + limit]
+ProjectDep = Annotated[Project, Depends(get_project_or_404)]
 
 
-@router.get("/{project_id}")
-def get_project(project_id: int) -> ProjectRead:
-    project = _projects.get(project_id)
+@router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
+async def create_project(payload: ProjectCreate, session: SessionDep):
+    project = Project(**payload.model_dump())
+    session.add(project)
+    await session.commit()
+    await session.refresh(project)
+    return project
+
+
+@router.get("", response_model=list[ProjectRead])
+async def list_projects(
+    session: SessionDep,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+):
+    result = await session.execute(
+        select(Project).order_by(Project.id).offset(skip).limit(limit)
+    )
+    return result.scalars().all()
+
+
+@router.get("/{project_id}", response_model=ProjectRead)
+async def get_project(project_id: int, session: SessionDep):
+    project = await session.get(Project, project_id)
     if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -42,16 +57,18 @@ def get_project(project_id: int) -> ProjectRead:
     return project
 
 
-@router.patch("/{project_id}")
-def update_project(project_id: int, payload: ProjectUpdate) -> ProjectRead:
-    project = get_project(project_id)
+@router.patch("/{project_id}", response_model=ProjectRead)
+async def update_project(project_id: int, payload: ProjectUpdate, session: SessionDep):
+    project = await get_project(project_id, session)
     updates = payload.model_dump(exclude_unset=True)
-    updated = project.model_copy(update=updates)
-    _projects[project_id] = updated
-    return updated
+    for field, value in updates.items():
+        setattr(project, field, value)
+    await session.commit()
+    return project
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(project_id: int) -> None:
-    get_project(project_id)
-    del _projects[project_id]
+async def delete_project(project_id: int, session: SessionDep) -> None:
+    project = await get_project(project_id, session)
+    await session.delete(project)
+    await session.commit()
