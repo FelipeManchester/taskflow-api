@@ -2,15 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
+from app.dependencies import SessionDep
 from app.models import Project
 from app.schemas import ProjectCreate, ProjectRead, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 async def get_project_or_404(project_id: int, session: SessionDep) -> Project:
