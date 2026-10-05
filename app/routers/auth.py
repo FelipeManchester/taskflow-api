@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -18,22 +19,24 @@ async def register(payload: UserCreate, session: SessionDep):
     existing = await session.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
         )
 
+    hashed = await run_in_threadpool(hash_password, payload.password)
     user = User(
         email=payload.email,
-        hashed_password=hash_password(payload.password),
+        hashed_password=hashed,
         full_name=payload.full_name,
     )
-
     session.add(user)
     try:
         await session.commit()
     except IntegrityError:
         await session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
         ) from None
     await session.refresh(user)
     return user
@@ -46,7 +49,7 @@ async def login(
 ):
     user = await session.scalar(select(User).where(User.email == form.username))
     hashed = user.hashed_password if user else DUMMY_HASH
-    password_ok = verify_password(form.password, hashed)
+    password_ok = await run_in_threadpool(verify_password, form.password, hashed)
 
     if user is None or not password_ok:
         raise HTTPException(
