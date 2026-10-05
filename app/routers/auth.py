@@ -3,11 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.dependencies import SessionDep
 from app.models import User
 from app.schemas import Token, UserCreate, UserRead
-from app.security import create_access_token, hash_password, verify_password
+from app.security import DUMMY_HASH, create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,7 +28,13 @@ async def register(payload: UserCreate, session: SessionDep):
     )
 
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+        ) from None
     await session.refresh(user)
     return user
 
@@ -38,11 +45,13 @@ async def login(
     session: SessionDep,
 ):
     user = await session.scalar(select(User).where(User.email == form.username))
-    if user is None or not verify_password(form.password, user.hashed_password):
+    hashed = user.hashed_password if user else DUMMY_HASH
+    password_ok = verify_password(form.password, hashed)
+
+    if user is None or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
     return Token(access_token=create_access_token(str(user.id)))
