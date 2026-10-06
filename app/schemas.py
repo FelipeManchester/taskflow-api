@@ -20,6 +20,7 @@ class ProjectRead(BaseModel):
     name: str
     description: str | None
     created_at: datetime
+    owner_id: int
 
 
 class UserCreate(BaseModel):
