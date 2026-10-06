@@ -3,16 +3,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.dependencies import SessionDep
+from app.dependencies import CurrentUserDep, SessionDep
 from app.models import Project
 from app.schemas import ProjectCreate, ProjectRead, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-async def get_project_or_404(project_id: int, session: SessionDep) -> Project:
+async def get_project_or_404(
+    project_id: int, session: SessionDep, current_user: CurrentUserDep
+) -> Project:
     project = await session.get(Project, project_id)
-    if project is None:
+    if project is None or project.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
@@ -24,8 +26,10 @@ ProjectDep = Annotated[Project, Depends(get_project_or_404)]
 
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
-async def create_project(payload: ProjectCreate, session: SessionDep):
-    project = Project(**payload.model_dump())
+async def create_project(
+    payload: ProjectCreate, session: SessionDep, current_user: CurrentUserDep
+):
+    project = Project(**payload.model_dump(), owner_id=current_user.id)
     session.add(project)
     await session.commit()
     await session.refresh(project)
@@ -35,11 +39,16 @@ async def create_project(payload: ProjectCreate, session: SessionDep):
 @router.get("", response_model=list[ProjectRead])
 async def list_projects(
     session: SessionDep,
+    current_user: CurrentUserDep,
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ):
     result = await session.execute(
-        select(Project).order_by(Project.id).offset(skip).limit(limit)
+        select(Project)
+        .where(Project.owner_id == current_user.id)
+        .order_by(Project.id)
+        .offset(skip)
+        .limit(limit)
     )
     return result.scalars().all()
 
