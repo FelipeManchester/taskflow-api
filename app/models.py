@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from enum import StrEnum
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,7 +8,7 @@ from app.database import Base
 from app.enums import TaskPriority, TaskStatus
 
 
-def enum_values(enum_cls):
+def enum_values(enum_cls: type[StrEnum]) -> list[str]:
     return [member.value for member in enum_cls]
 
 
@@ -66,6 +67,7 @@ class Task(Base):
     due_date: Mapped[date | None]
     assignee_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
+        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
