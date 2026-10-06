@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.enums import TaskPriority, TaskStatus
 
 
 class ProjectCreate(BaseModel):
@@ -42,3 +44,36 @@ class UserRead(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    status: TaskStatus = TaskStatus.TODO
+    priority: TaskPriority = TaskPriority.MEDIUM
+    due_date: date | None = None
+    assignee_id: int | None = None
+
+
+class TaskUpdate(BaseModel):
+    title: str = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    status: TaskStatus = Field(default=None)
+    priority: TaskPriority = Field(default=None)
+    due_date: date | None = None
+    assignee_id: int | None = None
+
+
+class TaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int
+    title: str
+    description: str | None
+    status: TaskStatus
+    priority: TaskPriority
+    due_date: date | None
+    assignee_id: int | None
+    created_at: datetime
+    updated_at: datetime
