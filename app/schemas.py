@@ -48,7 +48,7 @@ class Token(BaseModel):
 
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=5000)
     status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
     due_date: date | None = None
@@ -57,7 +57,7 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     title: str = Field(default=None, min_length=1, max_length=200)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=5000)
     status: TaskStatus = Field(default=None)
     priority: TaskPriority = Field(default=None)
     due_date: date | None = None

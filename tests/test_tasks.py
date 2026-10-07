@@ -217,7 +217,9 @@ async def test_cannot_list_tasks_of_another_users_project(client, bob, alice_pro
 async def test_get_task_returns_200(client, alice, alice_project):
     task = await create_task(client, alice, alice_project["id"], title="Buscar")
 
-    response = await client.get(task_url(alice_project["id"], task["id"]), headers=alice)
+    response = await client.get(
+        task_url(alice_project["id"], task["id"]), headers=alice
+    )
 
     assert response.status_code == 200
     assert response.json()["title"] == "Buscar"
@@ -233,7 +235,9 @@ async def test_get_task_through_wrong_project_returns_404(client, alice, alice_p
     other_project = await create_project(client, alice)
     task = await create_task(client, alice, alice_project["id"])
 
-    response = await client.get(task_url(other_project["id"], task["id"]), headers=alice)
+    response = await client.get(
+        task_url(other_project["id"], task["id"]), headers=alice
+    )
 
     assert response.status_code == 404
 
