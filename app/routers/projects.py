@@ -1,28 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Query, status
 from sqlalchemy import select
 
-from app.dependencies import CurrentUserDep, SessionDep
+from app.dependencies import CurrentUserDep, ProjectDep, SessionDep
 from app.models import Project
 from app.schemas import ProjectCreate, ProjectRead, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-
-
-async def get_project_or_404(
-    project_id: int, session: SessionDep, current_user: CurrentUserDep
-) -> Project:
-    project = await session.get(Project, project_id)
-    if project is None or project.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
-    return project
-
-
-ProjectDep = Annotated[Project, Depends(get_project_or_404)]
 
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
