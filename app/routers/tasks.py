@@ -11,6 +11,20 @@ from app.schemas import TaskCreate, TaskRead, TaskUpdate
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["tasks"])
 
 
+async def get_task_or_404(
+    task_id: int, session: SessionDep, project: ProjectDep
+) -> Task:
+    task = await session.get(Task, task_id)
+    if task is None or task.project_id != project.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    return task
+
+
+TaskDep = Annotated[Task, Depends(get_task_or_404)]
+
+
 async def ensure_assignee_exists(
     session: AsyncSession, assignee_id: int | None
 ) -> None:
@@ -45,20 +59,6 @@ async def list_tasks(session: SessionDep, project: ProjectDep):
         select(Task).where(Task.project_id == project.id).order_by(Task.id)
     )
     return result.scalars().all()
-
-
-async def get_task_or_404(
-    task_id: int, session: SessionDep, project: ProjectDep
-) -> Task:
-    task = await session.get(Task, task_id)
-    if task is None or task.project_id != project.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
-    return task
-
-
-TaskDep = Annotated[Task, Depends(get_task_or_404)]
 
 
 @router.get("/{task_id}", response_model=TaskRead)
